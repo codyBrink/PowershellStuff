@@ -1,0 +1,127 @@
+# PS script to get a list of all hosts that have been active within a given amount of days (along with static entries) and stores it into a csv file
+
+# Author: Cody Brink
+
+ 
+
+# takes a name of a dns server, the zone name, the amount of days you want to go back by and the path where you want the csv file stored
+
+function getDnsRecords($dnsServerName, $zoneName, $numOfDays, $filePath)
+
+{
+
+    $dnsServer = $dnsServerName
+
+    $zoneToLookFor = $zoneName
+
+    # connect to the DNS server and import the DnsServer module from it
+
+    $session = New-PSSession -ComputerName $dnsServer -Credential (Get-Credential)
+
+    Invoke-Command $session -Scriptblock { Import-Module DnsServer }
+
+    Import-PSSession -Session $session -module DnsServer
+
+    $zones = @(Get-DnsServerZone -ComputerName $DNSServer)
+
+    # list to store the filtered records
+
+    $retrievedRecords = New-Object Collections.Generic.List[String]
+
+    ForEach($zone in $zones)
+
+    {
+
+         # lookls for the zone you want to grab records from
+
+         if($zone.ZoneName -eq $zoneToLookFor)
+
+         {
+
+            ForEach($record in $zone | Get-DnsServerResourceRecord -ComputerName $dnsServer)
+
+            {
+
+                # gets the timestamp of each record and grabs the MM/DD/YYYY portion to compare with current date
+
+                $timestampOfRecord = $record.Timestamp -split "\s+"
+
+                # check if the timestamp is empty
+
+                if($timestampOfRecord[0])
+
+                {
+
+                    # filter records based on the number of days passed into parameter
+
+                    $timeOfLastEntry = Get-Date($timestampOfRecord[0])
+
+                    $currentDate = get-Date -Format "MM/dd/yyyy"
+
+                    $delta = New-TimeSpan -Start $timeOfLastEntry -End $currentDate
+
+                    if($delta.Days -lt $numOfDays)
+
+                    {
+
+                        # only get records that 'Answered" the DNS query
+
+                        $query = Resolve-DnsName -Name $record.HostName  -ErrorAction Ignore | Select-Object Section, IPAddress
+
+                        if($query.Section -eq "Answer")
+
+                        {
+
+                            # adds the records that have passed the checks to the list
+
+                            $retrievedRecords.Add($record.HostName+","+$query.IPAddress+","+"Dynamic")
+
+                        }
+
+                    }
+
+                }
+
+                else
+
+                {
+
+                    # adds static entries to the list
+
+                    if($record.RecordType -eq "A")
+
+                    {
+
+                        $query = Resolve-DnsName -Name $record.HostName -ErrorAction Ignore | Select-Object IPAddress
+
+                        $retrievedRecords.Add($record.HostName+","+$query.IPAddress+","+"Static")
+
+                    }
+
+                }
+
+            }
+
+         }
+
+    }
+
+    # writes the list to the csv file
+
+    foreach($rec in $retrievedRecords)
+
+    {
+
+        # will create the if it doesn't exit
+
+        Add-Content -Path $filePath -Value $rec
+
+    }
+
+}
+
+ 
+
+# example call:
+
+# getDnsRecords "MyNS1" "MyDomain.local" 60 "path\to\file.csv"
