@@ -2,8 +2,6 @@
 
 # Author: Cody Brink
 
- 
-
 # takes a name of a dns server, the zone name, the amount of days you want to go back by and the path where you want the csv file stored
 
 function getDnsRecords($dnsServerName, $zoneName, $numOfDays, $filePath)
@@ -119,8 +117,6 @@ function getDnsRecords($dnsServerName, $zoneName, $numOfDays, $filePath)
     }
 
 }
-
- 
 
 # example call:
 
